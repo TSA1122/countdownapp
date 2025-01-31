@@ -11,53 +11,23 @@ struct WorldCountdownsView: View {
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
     var body: some View {
-        VStack {
+        ScrollView {
             if worldCountdowns.isEmpty {
-                Text("No world countdowns available")
-                    .foregroundColor(.gray)
+                EmptyStateView(message: "No world countdowns available")
             } else {
-                List(worldCountdowns, id: \.id) { countdown in
-                    VStack(spacing: 0) {
-                        Spacer()
-                            .frame(height: 16)  // Reduced from default Spacer height
-                        ZStack {
-                            Text(countdown.name)
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)  // Added to center text
-                            
-                            HStack {
-                                Spacer()
-                                Button(action: {
-                                    toggleFavorite(countdown)
-                                }) {
-                                    Image(systemName: viewModel.favoritedCountdowns.contains(countdown.id) ? "star.fill" : "star")
-                                        .foregroundColor(viewModel.favoritedCountdowns.contains(countdown.id) ? .yellow : .gray)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        
-                        Spacer()
-                            .frame(height: 24)  // Adjusted middle spacing
-                        
-                        let components = calculateTimeRemaining(until: countdown.date)
-                        HStack(spacing: 20) {
-                            if components.years > 0 {
-                                TimeBoxView(value: components.years, unit: "Years")
-                            }
-                            TimeBoxView(value: components.days, unit: "Days")
-                            TimeBoxView(value: components.hours, unit: "Hours")
-                            TimeBoxView(value: components.minutes, unit: "Minutes")
-                        }
-                        .frame(maxWidth: .infinity, alignment: .center)  // Added to center HStack
-                        .padding(.bottom, 16)  // Reduced bottom padding
+                LazyVStack(spacing: 16) {
+                    ForEach(worldCountdowns, id: \.id) { countdown in
+                        CountdownCard(countdown: countdown,
+                                    isFavorited: viewModel.favoritedCountdowns.contains(countdown.id),
+                                    onFavorite: { toggleFavorite(countdown) },
+                                    timeComponents: calculateTimeRemaining(until: countdown.date))
+                            .transition(.scale)
                     }
-                    .frame(height: 160)  // Reduced overall height
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))  // Reduced top/bottom insets
                 }
-                .listRowSpacing(16)
+                .padding()
             }
         }
+        .background(Color.gray.opacity(0.05))
         .alert("Premium Feature", isPresented: $showError) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -180,5 +150,74 @@ struct WorldCountdownsView: View {
                 viewModel.fetchUserCountdowns()
             }
         }
+    }
+}
+
+struct CountdownCard: View {
+    let countdown: Countdown
+    let isFavorited: Bool
+    let onFavorite: () -> Void
+    let timeComponents: (years: Int, days: Int, hours: Int, minutes: Int)
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text(countdown.name)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                Spacer()
+                FavoriteButton(isFavorited: isFavorited, action: onFavorite)
+            }
+            .padding()
+            
+            // Time components
+            HStack(spacing: 12) {
+                if timeComponents.years > 0 {
+                    TimeBoxView(value: timeComponents.years, unit: "Years")
+                }
+                TimeBoxView(value: timeComponents.days, unit: "Days")
+                TimeBoxView(value: timeComponents.hours, unit: "Hours")
+                TimeBoxView(value: timeComponents.minutes, unit: "Minutes")
+            }
+            .padding()
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white)
+                .shadow(color: .gray.opacity(0.2), radius: 5, x: 0, y: 2)
+        )
+    }
+}
+
+struct FavoriteButton: View {
+    let isFavorited: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: isFavorited ? "star.fill" : "star")
+                .foregroundColor(isFavorited ? .yellow : .gray)
+                .font(.title3)
+        }
+        .scaleEffect(isFavorited ? 1.1 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isFavorited)
+    }
+}
+
+struct EmptyStateView: View {
+    let message: String
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "globe")
+                .font(.system(size: 60))
+                .foregroundColor(.blue.opacity(0.5))
+            Text(message)
+                .font(.headline)
+                .foregroundColor(.gray)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
     }
 }

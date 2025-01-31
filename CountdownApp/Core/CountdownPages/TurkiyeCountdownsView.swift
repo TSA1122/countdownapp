@@ -3,27 +3,9 @@ import FirebaseAuth
 import FirebaseFirestore
 
 struct Countdown {
-    let id: String  // Add this
+    let id: String
     let name: String
     let date: Date
-}
-
-struct TimeBoxView: View {
-    let value: Int
-    let unit: String
-    
-    var body: some View {
-        VStack {
-            Text("\(value)")
-                .font(.title2)
-                .bold()
-            Text(unit)
-                .font(.caption)
-        }
-        .frame(width: 70, height: 70)
-        .background(Color.gray.opacity(0.2))
-        .cornerRadius(10)
-    }
 }
 
 struct TurkiyeCountdownsView: View {
@@ -35,52 +17,27 @@ struct TurkiyeCountdownsView: View {
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
     var body: some View {
-        VStack {
+        ScrollView {
             if turkiyeCountdowns.isEmpty {
-                Text("No Türkiye countdowns available")
-                    .foregroundColor(.gray)
+                EmptyStateView(message: "No Türkiye countdowns available")
             } else {
-                List(turkiyeCountdowns, id: \.id) { countdown in
-                    VStack(spacing: 0) {
-                        Spacer()
-                            .frame(height: 16)  // Reduced from default Spacer height
-                        ZStack {
-                            Text(countdown.name)
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)  // Added to center text
-                            
-                            HStack {
-                                Spacer()
-                                Button(action: {
-                                    toggleFavorite(countdown)
-                                }) {
-                                    Image(systemName: viewModel.favoritedCountdowns.contains(countdown.id) ? "star.fill" : "star")
-                                        .foregroundColor(viewModel.favoritedCountdowns.contains(countdown.id) ? .yellow : .gray)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        
-                        Spacer()
-                            .frame(height: 24)  // Adjusted middle spacing
-                        
-                        let components = calculateTimeRemaining(until: countdown.date)
-                        HStack(spacing: 20) {
-                            if components.years > 0 {
-                                TimeBoxView(value: components.years, unit: "Years")
-                            }
-                            TimeBoxView(value: components.days, unit: "Days")
-                            TimeBoxView(value: components.hours, unit: "Hours")
-                            TimeBoxView(value: components.minutes, unit: "Minutes")
-                        }
-                        .frame(maxWidth: .infinity, alignment: .center)  // Added to center HStack
-                        .padding(.bottom, 16)  // Reduced bottom padding
+                LazyVStack(spacing: 16) {
+                    ForEach(turkiyeCountdowns, id: \.id) { countdown in
+                        CountdownCard(countdown: countdown,
+                                    isFavorited: viewModel.favoritedCountdowns.contains(countdown.id),
+                                    onFavorite: { toggleFavorite(countdown) },
+                                    timeComponents: calculateTimeRemaining(until: countdown.date))
+                            .transition(.scale)
                     }
-                    .frame(height: 160)  // Reduced overall height
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))  // Reduced top/bottom insets
                 }
-                .listRowSpacing(16)
+                .padding()
             }
+        }
+        .background(Color.gray.opacity(0.05))
+        .alert("Premium Feature", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
         }
         .onAppear {
             fetchTurkiyeCountdowns()
@@ -88,11 +45,6 @@ struct TurkiyeCountdownsView: View {
         }
         .onReceive(timer) { _ in
             currentTime = Date()
-        }
-        .alert("Premium Feature", isPresented: $showError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(errorMessage)
         }
     }
     
@@ -116,7 +68,9 @@ struct TurkiyeCountdownsView: View {
     
     private func fetchTurkiyeCountdowns() {
         let db = Firestore.firestore()
-        db.collection("turkiye_specific_countdowns").getDocuments { snapshot, error in
+        db.collection("turkiye_specific_countdowns")
+            .order(by: "date", descending: true)  // Changed ascending to descending
+            .getDocuments { snapshot, error in
             if let error = error {
                 print("Error fetching Türkiye countdowns: \(error)")
                 return
