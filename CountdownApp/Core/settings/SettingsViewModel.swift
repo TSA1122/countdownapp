@@ -45,4 +45,35 @@ class SettingsViewModel: ObservableObject {
             }
         }
     }
+    
+    func deleteAccount(password: String) async -> (Bool, String) {
+        guard let user = Auth.auth().currentUser,
+              let email = user.email else {
+            error = "User not found"
+            return (false, "User not found")
+        }
+        
+        isLoading = true
+        
+        do {
+            let credential = EmailAuthProvider.credential(withEmail: email, password: password)
+            do {
+                try await user.reauthenticate(with: credential)
+            } catch {
+                self.error = "Incorrect password. Please try again."
+                isLoading = false
+                return (false, "Incorrect password. Please try again.")
+            }
+            
+            let authViewModel = AuthViewModel()
+            let success = try await authViewModel.deleteAccount()
+            
+            isLoading = false
+            return (success, success ? "Account successfully deleted" : "Failed to delete account")
+        } catch {
+            self.error = error.localizedDescription
+            isLoading = false
+            return (false, error.localizedDescription)
+        }
+    }
 }

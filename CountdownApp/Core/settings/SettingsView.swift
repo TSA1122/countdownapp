@@ -3,6 +3,7 @@ import FirebaseAuth
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var viewModel = SettingsViewModel()
     @State private var showingPasswordChange = false
     @State private var currentPassword = ""
@@ -13,6 +14,13 @@ struct SettingsView: View {
     @State private var alertTitle = ""
     @State private var alertMessage = ""
     @State private var isSuccess = false
+    @State private var showingDeleteAccount = false
+    @State private var deleteAccountPassword = ""
+    @State private var showingDeleteConfirmation = false
+    @State private var showDeleteError = false
+    @State private var deleteErrorMessage = ""
+    @State private var showSuccessAlert = false
+    @State private var successMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -21,9 +29,14 @@ struct SettingsView: View {
                     Button("Change Password") {
                         showingPasswordChange = true
                     }
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Text("Delete Account")
+                    }
                 }
 
-                Section("App") {
+                Section("Remainder App") {
                     NavigationLink("About") {
                         AboutView()
                     }
@@ -104,6 +117,67 @@ struct SettingsView: View {
                 }
                 .presentationDetents([.medium])
             }
+            .sheet(isPresented: $showingDeleteAccount) {
+                NavigationStack {
+                    Form {
+                        Section {
+                            SecureField("Enter Password to Confirm", text: $deleteAccountPassword)
+                        } header: {
+                            Text("This action cannot be undone. All your data will be permanently deleted.")
+                        }
+                    }
+                    .navigationTitle("Delete Account")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("Cancel") {
+                                showingDeleteAccount = false
+                            }
+                        }
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Delete", role: .destructive) {
+                                Task {
+                                    let (success, message) = await viewModel.deleteAccount(password: deleteAccountPassword)
+                                    if success {
+                                        successMessage = message
+                                        showSuccessAlert = true
+                                    } else {
+                                        deleteErrorMessage = message
+                                        showDeleteError = true
+                                    }
+                                }
+                            }
+                            .disabled(deleteAccountPassword.isEmpty)
+                        }
+                    }
+                    .alert("Error", isPresented: $showDeleteError) {
+                        Button("OK") { }
+                    } message: {
+                        Text(deleteErrorMessage)
+                    }
+                    .alert("Success", isPresented: $showSuccessAlert) {
+                        Button("OK") {
+                            showingDeleteAccount = false
+                            dismiss()  // Dismiss settings view
+                        }
+                    } message: {
+                        Text(successMessage)
+                    }
+                }
+                .presentationDetents([.medium])
+            }
+            .confirmationDialog(
+                "Are you sure you want to delete your account?",
+                isPresented: $showingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Account", role: .destructive) {
+                    showingDeleteAccount = true
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This action cannot be undone")
+            }
             .alert(alertTitle, isPresented: $showAlert) {
                 Button("OK") { }
             } message: {
@@ -114,22 +188,109 @@ struct SettingsView: View {
 }
 
 struct AboutView: View {
+    @State private var aboutContent: String = ""
+    
     var body: some View {
-        Text("About the app")
-            .navigationTitle("About")
+        ScrollView {
+            if let attributedString = try? AttributedString(
+                markdown: aboutContent,
+                options: AttributedString.MarkdownParsingOptions(
+                    interpretedSyntax: .inlineOnlyPreservingWhitespace
+                )
+            ) {
+                Text(attributedString)
+                    .padding()
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text("Failed to load content")
+                    .foregroundColor(.red)
+            }
+        }
+        .navigationTitle("About")
+        .onAppear {
+            loadAboutContent()
+        }
+    }
+    
+    private func loadAboutContent() {
+        guard let path = Bundle.main.path(forResource: "about", ofType: "md"),
+              let content = try? String(contentsOfFile: path, encoding: .utf8) else {
+            aboutContent = "Error loading content"
+            return
+        }
+        aboutContent = content
     }
 }
 
 struct PrivacyPolicyView: View {
+    @State private var privacyContent: String = ""
+    
     var body: some View {
-        Text("Privacy Policy content")
-            .navigationTitle("Privacy Policy")
+        ScrollView {
+            if let attributedString = try? AttributedString(
+                markdown: privacyContent,
+                options: AttributedString.MarkdownParsingOptions(
+                    interpretedSyntax: .inlineOnlyPreservingWhitespace
+                )
+            ) {
+                Text(attributedString)
+                    .padding()
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text("Failed to load content")
+                    .foregroundColor(.red)
+            }
+        }
+        .navigationTitle("Privacy Policy")
+        .onAppear {
+            loadPrivacyContent()
+        }
+    }
+    
+    private func loadPrivacyContent() {
+        guard let path = Bundle.main.path(forResource: "privacy_policy", ofType: "md"),
+              let content = try? String(contentsOfFile: path, encoding: .utf8) else {
+            privacyContent = "Error loading privacy policy content"
+            return
+        }
+        privacyContent = content
     }
 }
 
 struct TermsOfServiceView: View {
+    @State private var termsContent: String = ""
+    
     var body: some View {
-        Text("Terms of Service content")
-            .navigationTitle("Terms of Service")
+        ScrollView {
+            if let attributedString = try? AttributedString(
+                markdown: termsContent,
+                options: AttributedString.MarkdownParsingOptions(
+                    interpretedSyntax: .inlineOnlyPreservingWhitespace
+                )
+            ) {
+                Text(attributedString)
+                    .padding()
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text("Failed to load content")
+                    .foregroundColor(.red)
+            }
+        }
+        .navigationTitle("Terms of Service")
+        .onAppear {
+            loadTermsContent()
+        }
+    }
+    
+    private func loadTermsContent() {
+        guard let path = Bundle.main.path(forResource: "terms_of_use", ofType: "md"),
+              let content = try? String(contentsOfFile: path, encoding: .utf8) else {
+            termsContent = "Error loading terms of service content"
+            return
+        }
+        termsContent = content
     }
 }
