@@ -30,6 +30,7 @@ class AuthViewModel: ObservableObject {
             let result = try await Auth.auth().signIn(withEmail: email, password: password)
             self.userSession = result.user
         } catch {
+            self.error = handleAuthError(error)
             throw error
         }
     }
@@ -59,5 +60,44 @@ class AuthViewModel: ObservableObject {
             "countdowns": [:],  // Changed from [] to {} in Firestore
             "createdAt": FieldValue.serverTimestamp()
         ])
+    }
+    
+    func deleteAccount() async throws -> Bool {
+        guard let user = Auth.auth().currentUser else { throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "No user logged in"]) }
+        
+        let db = Firestore.firestore()
+        do {
+            // Delete user document and countdowns
+            try await db.collection("user_countdowns").document(user.uid).delete()
+            
+            // Delete the user account
+            try await user.delete()
+            self.userSession = nil
+            return true
+        } catch {
+            throw error
+        }
+    }
+    
+    private func handleAuthError(_ error: Error) -> String {
+        let authError = error as NSError
+        switch authError.code {
+        case AuthErrorCode.wrongPassword.rawValue:
+            return "Incorrect password. Please try again."
+        case AuthErrorCode.invalidEmail.rawValue:
+            return "Invalid email address format."
+        case AuthErrorCode.userNotFound.rawValue:
+            return "No account exists with this email."
+        case AuthErrorCode.tooManyRequests.rawValue:
+            return "Too many attempts. Please try again later."
+        case AuthErrorCode.networkError.rawValue:
+            return "Network error. Please check your connection."
+        case AuthErrorCode.emailAlreadyInUse.rawValue:
+            return "This email is already registered."
+        case AuthErrorCode.invalidCredential.rawValue:
+            return "Email or password is incorrect."
+        default:
+            return error.localizedDescription
+        }
     }
 }
