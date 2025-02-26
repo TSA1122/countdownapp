@@ -85,7 +85,6 @@ struct LoginView: View {
                             do {
                                 try await viewModel.signIn(withEmail: email, password: password)
                             } catch {
-                                viewModel.error = error.localizedDescription
                                 showError = true
                             }
                         }
@@ -129,7 +128,7 @@ struct LoginView: View {
                 .padding(.horizontal)
             }
         }
-        .alert("Error", isPresented: $showError) {
+        .alert("Authentication Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(viewModel.error ?? "An error occurred")

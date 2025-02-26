@@ -57,8 +57,8 @@ struct CountdownsView: View {
                                     .listRowSeparator(.hidden)
                                     .listRowInsets(EdgeInsets())
                                 
-                                // Your existing countdown items
-                                ForEach(viewModel.userCountdowns, id: \.id) { countdown in
+                                // Sort countdowns by date and display them
+                                ForEach(viewModel.userCountdowns.sorted(by: { $0.date < $1.date }), id: \.id) { countdown in
                                     ZStack(alignment: .topTrailing) {
                                         // Updated card background with new gradient
                                         RoundedRectangle(cornerRadius: 15)
